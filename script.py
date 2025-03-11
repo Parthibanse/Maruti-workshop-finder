@@ -2,33 +2,67 @@ import streamlit as st
 import pandas as pd
 
 # Load the dataset
-df = pd.read_excel("Workshop_Dashboard.xlsx", sheet_name="Dashboard")
+FILE_PATH = "Workshop details.xlsx"
+try:
+    df = pd.read_excel(FILE_PATH)
+    df.columns = df.columns.str.strip().str.lower()  # Normalize column names
+except FileNotFoundError:
+    st.error("Error: The specified file was not found. Please upload the correct file.")
+    st.stop()
+except Exception as e:
+    st.error(f"Error loading the file: {e}")
+    st.stop()
+
+# Check if required columns exist
+required_columns = ["pincode", "channel", "body shop", "state"]
+missing_columns = [col for col in required_columns if col not in df.columns]
+if missing_columns:
+    st.error(f"Missing columns in the dataset: {', '.join(missing_columns)}")
+    st.stop()
+
+# Function to find nearest pincodes
+def get_nearest_pincodes(pincode, df, num_results=5):
+    if pincode not in df["pincode"].astype(str).values:
+        return df.head(num_results)
+    return df[df["pincode"].astype(str) == str(pincode)].head(num_results)
 
 # Streamlit UI
 def main():
-    st.title("Sheet1")
+    st.title("Workshop Dashboard")
+    
+    if df.empty:
+        st.warning("No data available. Please check the uploaded file.")
+        return
     
     # Search by Pincode
     pincode = st.text_input("Enter Pincode:")
     
     # Filters
-    channel = st.selectbox("Select Channel:", ["All", "Arena", "Nexa"])
-    body shop = st.selectbox("body shop:", ["All"] + sorted(df["body shop"].unique()))
-    state = st.selectbox("Select State:", ["All"] + sorted(df["State"].unique()))
+    channels = df["channel"].dropna().unique().tolist()
+    channel = st.selectbox("Select Channel:", ["All"] + channels)
+    
+    body_shop = st.selectbox("Body Shop:", ["All"] + sorted(df["body shop"].dropna().unique()))
+    
+    states = df["state"].dropna().unique().tolist()
+    state = st.selectbox("Select State:", ["All"] + states)
     
     # Filter data based on inputs
     filtered_df = df.copy()
-    if Pincode:
-        filtered_df = filtered_df[filtered_df["PIN CODE"].astype(str).str.startswith(pincode[:3])]
+    if pincode:
+        filtered_df = get_nearest_pincodes(pincode, df)
     if channel != "All":
-        filtered_df = filtered_df[filtered_df["Channel"] == channel]
-    if body shop != "All":
-        filtered_df = filtered_df[filtered_df["body shop"].str.strip() == body shop]
-    if State != "All":
-        filtered_df = filtered_df[filtered_df["State"] == State]
+        filtered_df = filtered_df[filtered_df["channel"] == channel]
+    if body_shop != "All":
+        filtered_df = filtered_df[filtered_df["body shop"] == body_shop]
+    if state != "All":
+        filtered_df = filtered_df[filtered_df["state"] == state]
     
     # Display filtered data
-    st.write("### Filtered Workshops", filtered_df)
+    if not filtered_df.empty:
+        st.write("### Filtered Workshops")
+        st.dataframe(filtered_df)
+    else:
+        st.warning("No results found for the selected filters.")
 
 if __name__ == "__main__":
     main()
